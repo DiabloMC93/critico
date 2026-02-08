@@ -176,7 +176,6 @@
         <h1>Mis Repositorios</h1>
         <p>Acceso directo a despliegues y tests</p>
         
-        <!-- UI del Contador -->
         <div class="visitor-counter" id="counter-container">
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path>
@@ -252,70 +251,80 @@
         &copy; 2026 Dashboard de Enlaces
     </footer>
 
-    <!-- Firebase SDK (ESM) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // CONFIGURACIÓN GLOBAL
+        // Inicialización de Firebase con configuración del entorno
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        
         const counterElement = document.getElementById('visit-count');
 
-        // FUNCIÓN PRINCIPAL DE AUTENTICACIÓN Y CONTEO
-        async function handleVisitorCounter() {
-            try {
-                // Paso 1: Autenticación (Prioridad al token del sistema)
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+        // Función con exponential backoff para reintentos
+        async function runWithRetry(fn, maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    return await fn();
+                } catch (err) {
+                    if (i === maxRetries - 1) throw err;
+                    await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
                 }
-
-                // Paso 2: Escuchar el estado de autenticación
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        // Ruta estricta de Firestore para este entorno
-                        const counterDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'site_stats', 'global');
-
-                        // Paso 3: Incrementar contador una sola vez por sesión
-                        const docSnap = await getDoc(counterDocRef);
-                        
-                        if (!docSnap.exists()) {
-                            // Crear el documento si es la primera vez
-                            await setDoc(counterDocRef, { count: 1 });
-                        } else {
-                            // Incrementar el valor actual
-                            await updateDoc(counterDocRef, {
-                                count: increment(1)
-                            });
-                        }
-
-                        // Paso 4: Escuchar cambios en tiempo real para la UI
-                        onSnapshot(counterDocRef, (snapshot) => {
-                            if (snapshot.exists()) {
-                                const data = snapshot.data();
-                                counterElement.innerText = data.count.toLocaleString();
-                            }
-                        }, (err) => {
-                            console.error("Error en tiempo real:", err);
-                        });
-                    }
-                });
-
-            } catch (error) {
-                console.error("Error crítico en el contador:", error);
-                counterElement.innerText = "Error";
             }
         }
 
-        // Inicializar cuando el DOM esté listo
-        document.addEventListener('DOMContentLoaded', handleVisitorCounter);
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await runWithRetry(() => signInWithCustomToken(auth, __initial_auth_token));
+                } else {
+                    await runWithRetry(() => signInAnonymously(auth));
+                }
+            } catch (error) {
+                console.error("Error de autenticación:", error);
+                counterElement.innerText = "Error Auth";
+            }
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) return;
+
+            // Ruta estricta requerida por el entorno
+            const counterDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'counters', 'visitors');
+
+            try {
+                // Intentar obtener el documento
+                const docSnap = await getDoc(counterDocRef);
+                
+                if (!docSnap.exists()) {
+                    // Inicializar si no existe
+                    await setDoc(counterDocRef, { count: 1 });
+                } else {
+                    // Incrementar
+                    await updateDoc(counterDocRef, { count: increment(1) });
+                }
+
+                // Suscripción en tiempo real para la interfaz
+                onSnapshot(counterDocRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        counterElement.innerText = snapshot.data().count.toLocaleString();
+                    }
+                }, (error) => {
+                    console.error("Error en Snapshot:", error);
+                    counterElement.innerText = "Error Sync";
+                });
+
+            } catch (error) {
+                console.error("Error de Firestore:", error);
+                counterElement.innerText = "Error DB";
+            }
+        });
+
+        // Iniciar proceso
+        initAuth();
     </script>
 </body>
 </html>
