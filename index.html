@@ -48,12 +48,14 @@
             width: 100%;
             max-width: 1100px;
             display: grid;
-            /* Forzamos 2 columnas iguales para el diseño 2x2 */
+            /* Definición clara de 2 columnas */
             grid-template-columns: repeat(2, 1fr);
+            /* Espaciado generoso para evitar solapamientos visuales */
             gap: 30px;
+            align-items: start;
         }
 
-        /* Adaptación para tablets y móviles */
+        /* Adaptación para móviles: 1 columna */
         @media (max-width: 900px) {
             .container {
                 grid-template-columns: 1fr;
@@ -70,7 +72,9 @@
             transition: transform 0.3s ease, border-color 0.3s ease;
             display: flex;
             flex-direction: column;
-            height: 100%; /* Asegura que los bloques tengan la misma altura si están en la misma fila */
+            /* Quitamos height fijo para que el grid gestione el espacio */
+            min-width: 0; /* Evita que el contenido desborde el ancho del grid */
+            box-sizing: border-box;
         }
 
         .block:hover {
@@ -94,24 +98,26 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            max-height: 350px;
+            /* Limitamos la altura máxima interna para que el bloque no crezca infinitamente */
+            max-height: 400px; 
             overflow-y: auto;
             padding-right: 8px;
         }
 
-        /* Estilización de la barra de desplazamiento */
+        /* Scrollbar personalizado */
         .link-list::-webkit-scrollbar {
             width: 6px;
         }
         .link-list::-webkit-scrollbar-track {
-            background: transparent;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
         }
         .link-list::-webkit-scrollbar-thumb {
             background: var(--border);
             border-radius: 10px;
         }
         .link-list::-webkit-scrollbar-thumb:hover {
-            background: var(--text-dim);
+            background: var(--accent);
         }
 
         .link-item {
@@ -165,7 +171,7 @@
 
     <header>
         <h1>Mis Repositorios</h1>
-        <p>Panel de control de recursos críticos (Diseño 2x2)</p>
+        <p>Panel de control optimizado (Cuadrícula 2x2)</p>
     </header>
 
     <div class="container">
@@ -258,7 +264,7 @@
     </div>
 
     <footer style="margin-top: 50px; color: var(--text-dim); font-size: 0.8rem; text-align: center; width: 100%;">
-        &copy; 2026 Dashboard de Enlaces Críticos - v2.1
+        &copy; 2026 Dashboard de Enlaces Críticos - v2.2 (Fix Grid overlap)
     </footer>
 
 </body>
